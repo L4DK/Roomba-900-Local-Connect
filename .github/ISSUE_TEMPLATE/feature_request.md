@@ -1,10 +1,9 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: "[FEATURE] - "
+about: Suggest an idea for this project.
+title: '[FEATURE] - '
 labels: enhancement
 assignees: L4DK
-
 ---
 
 ## 🚀 Is your feature request related to a problem?
