@@ -1,12 +1,11 @@
 """
 FilePath: "/Roomba-900-Local-Connect/roomba_unified_extractor.py"
 Project Title: Roomba-900-Local-Connect
-File Description: Unified tool to extract BLID and Password via pairing, 
-                 derive BLID from password, and use UDP fallback.
+File Description: Unified tool to extract BLID and Password. Now pulls default IP from .env.
 Author: "Michael Landbo"
 Date created: 31/03/2026
 Date Modified: 01/04/2026
-Version: v.2.1.0
+Version: v.2.2.0
 """
 
 import argparse
@@ -14,8 +13,13 @@ import json
 import re
 import socket
 import sys
+import os
 from typing import Any, Optional
 from roombapy import RoombaPassword  # type: ignore
+from dotenv import load_dotenv
+
+# Load existing .env if it exists
+load_dotenv()
 
 class Style:
     RESET = "\033[0m"
@@ -32,9 +36,6 @@ def info(msg: str) -> None:
 def success(msg: str) -> None:
     print(f"{Style.GREEN}[OK]{Style.RESET}   {msg}")
 
-def warn(msg: str) -> None:
-    print(f"{Style.YELLOW}[WARN]{Style.RESET} {msg}")
-
 def error(msg: str) -> None:
     print(f"{Style.RED}[ERROR]{Style.RESET} {msg}")
 
@@ -44,66 +45,60 @@ def header(title: str) -> None:
     print(f"{Style.BOLD}{title.center(60)}{Style.RESET}")
     print(f"{Style.MAGENTA}{line}{Style.RESET}")
 
-def extract_blid_unified(data: Any, robot_ip: str) -> Optional[str]:
-    # 1) Direct attributes
-    blid = getattr(data, "blid", None) or getattr(data, "username", None)
-    if blid: return str(blid).strip()
-
-    # 2) Derive from password structure (:1:BLID:PW)
-    raw_pw = getattr(data, "password", None)
-    if raw_pw:
-        pw_str = raw_pw.decode("utf-8") if isinstance(raw_pw, (bytes, bytearray)) else str(raw_pw)
-        match = re.match(r"^:1:(\d+):", pw_str)
-        if match: return match.group(1)
-
-    # 3) UDP fallback
-    return udp_discovery_fallback(robot_ip)
-
-def udp_discovery_fallback(ip: str) -> Optional[str]:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(3.0)
-    try:
-        sock.sendto(b'irobot_discovery', (ip, 5678))
-        data, _ = sock.recvfrom(2048)
-        return json.loads(data.decode()).get("hostname", "").replace("Roomba-", "").replace("bb-", "").strip()
-    except: return None
-    finally: sock.close()
-
 def run_unified_extractor(roomba_ip: str) -> int:
-    header("L4DK Unified Extractor – BLID & Password")
-    info(f"Connecting to Roomba at IP: {roomba_ip}")
-    print("\n1. Hold the HOME button until the melody plays...")
-    input("2. When it starts blinking: press ENTER to continue...")
+    header("Roomba Unified Extractor – BLID & Password")
+    info(f"Targeting Roomba at IP: {roomba_ip}")
+    print("\n1. Put Roomba in the dock.")
+    print("2. Hold the HOME button until the melody plays.")
+    input("3. When it starts blinking: press ENTER to continue...")
 
     try:
         rp = RoombaPassword(roomba_ip)
         data = rp.get_password()
         if not data:
-            error("No data received. Check IP, network, and pairing mode.")
+            error("No data received. Ensure the robot is in pairing mode.")
             return 1
 
         raw_password = str(getattr(data, "password", data))
+        # Extract the clean 16-char password from format :1:BLID:PASSWORD
         clean_password = raw_password.split(":")[-1] if ":" in raw_password else raw_password
-        blid = extract_blid_unified(data, roomba_ip)
+        
+        # Extract BLID from data object or derive from password string
+        blid = getattr(data, "blid", None) or getattr(data, "username", None)
+        if not blid and ":" in raw_password:
+            match = re.match(r"^:1:(\d+):", raw_password)
+            if match: blid = match.group(1)
 
         header("EXTRACTION RESULT")
         print(f"{Style.BOLD}BLID:           {Style.RESET}{blid or 'NOT FOUND'}")
-        print(f"{Style.BOLD}RAW PASSWORD:   {Style.RESET}{raw_password}")
         print(f"{Style.BOLD}CLEAN PASSWORD: {Style.RESET}{clean_password}")
 
         print("\n" + "-" * 60)
-        success("Extraction successful.")
-        print("Update your .env file with these values:\n")
-        print(f'  ROOMBA_BLID="{blid}"')
-        print(f'  ROOMBA_PASSWORD="{clean_password}"')
+        success("Credentials retrieved successfully.")
+        print("Add these to your .env file:\n")
+        print(f'ROOMBA_IP={roomba_ip}')
+        print(f'ROOMBA_BLID={blid}')
+        print(f'ROOMBA_PASSWORD={clean_password}')
         print("-" * 60)
         return 0
     except Exception as e:
-        error(f"Critical error: {e}")
+        error(f"Critical error during extraction: {e}")
         return 1
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--ip", "-i", default="192.168.1.17")
+    # Pull default IP from environment if available
+    default_ip = os.getenv("ROOMBA_IP")
+    
+    parser = argparse.ArgumentParser(description="Extract Roomba credentials.")
+    parser.add_argument(
+        "--ip", "-i", 
+        default=default_ip,
+        help="Roomba IP address (defaults to ROOMBA_IP from .env if set)"
+    )
     args = parser.parse_args()
+
+    if not args.ip:
+        error("IP address not found in .env and not provided via --ip argument.")
+        sys.exit(1)
+        
     sys.exit(run_unified_extractor(args.ip))
