@@ -1,10 +1,9 @@
 ---
-name: Bug report
-about: Create a report to help me improve the Roomba-900-Local-Connect suite.
-title: "[BUG] -"
+name: Bug Report
+about: Create a report to help us improve the Roomba-900-Local-Connect suite.
+title: '[BUG] - '
 labels: bug
 assignees: L4DK
-
 ---
 
 ## 🐛 Bug Description
