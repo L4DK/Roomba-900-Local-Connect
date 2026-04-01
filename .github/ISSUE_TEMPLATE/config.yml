@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 General Discussion
+    url: https://github.com/L4DK/Roomba-900-Local-Connect/discussions
+    about: Please use discussions for general chat and community brainstorming.
+  - name: 🛠 Technical Wiki
+    url: https://github.com/L4DK/Roomba-900-Local-Connect/wiki
+    about: Read the full technical documentation before opening an issue.
